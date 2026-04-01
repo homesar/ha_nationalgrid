@@ -35,7 +35,7 @@ async def async_setup_entry(
         hass=hass,
         logger=_LOGGER,
         name=DOMAIN,
-        update_interval=timedelta(hours=1),
+        update_interval=timedelta(minutes=15),
         username=entry.data[CONF_USERNAME],
         password=entry.data[CONF_PASSWORD],
     )
