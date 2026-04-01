@@ -16,6 +16,7 @@ from aionatgrid.exceptions import (
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .const import _LOGGER, CONF_SELECTED_ACCOUNTS
 
@@ -485,6 +486,31 @@ class NationalGridDataUpdateCoordinator(
         if not readings:
             return None
         return max(readings, key=lambda r: r.get("date", ""))
+
+    def get_today_interval_total(self, service_point_number: str) -> float | None:
+        """Get today's total kWh from interval reads, based on HA local time."""
+        if self.data is None:
+            return None
+        reads = self.data.interval_reads.get(service_point_number, [])
+        if not reads:
+            return None
+        today = dt_util.now().date()
+        total = 0.0
+        found = False
+        for read in reads:
+            start_str = read.get("startTime", "")
+            if not start_str:
+                continue
+            try:
+                dt = datetime.fromisoformat(start_str)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=UTC)
+                if dt_util.as_local(dt).date() == today:
+                    total += float(read.get("value", 0))
+                    found = True
+            except ValueError:
+                continue
+        return total if found else None
 
     def get_latest_interval_read(self, service_point_number: str) -> IntervalRead | None:
         """Get the most recent 15-minute interval read for a service point."""

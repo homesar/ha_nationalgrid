@@ -11,6 +11,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
+from homeassistant.const import EntityCategory
 
 from .const import _LOGGER, DOMAIN, UNIT_CCF, UNIT_KWH, therms_to_ccf
 from .entity import NationalGridEntity
@@ -19,6 +20,7 @@ PARALLEL_UPDATES = 1
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from datetime import datetime
 
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -113,6 +115,41 @@ def _get_latest_interval_read(
     return float(value) if value is not None else None
 
 
+def _get_latest_interval_read_time(
+    coordinator: NationalGridDataUpdateCoordinator, meter_data: MeterData
+) -> datetime | None:
+    """Get the start timestamp of the most recent 15-minute interval read."""
+    from datetime import UTC, datetime as dt
+
+    sp = str(meter_data.meter.get("servicePointNumber", ""))
+    read = coordinator.get_latest_interval_read(sp)
+    if read is None:
+        return None
+    start_str = read.get("startTime", "")
+    if not start_str:
+        return None
+    try:
+        parsed = dt.fromisoformat(start_str)
+        return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+    except ValueError:
+        return None
+
+
+def _get_today_interval_total(
+    coordinator: NationalGridDataUpdateCoordinator, meter_data: MeterData
+) -> float | None:
+    """Get today's total kWh from interval reads."""
+    sp = str(meter_data.meter.get("servicePointNumber", ""))
+    return coordinator.get_today_interval_total(sp)
+
+
+def _get_fuel_type(
+    _coordinator: NationalGridDataUpdateCoordinator, meter_data: MeterData
+) -> str | None:
+    """Get the fuel type for a meter."""
+    return meter_data.meter.get("fuelType")
+
+
 SENSOR_DESCRIPTIONS: tuple[NationalGridSensorEntityDescription, ...] = (
     NationalGridSensorEntityDescription(
         key="energy_cost",
@@ -150,6 +187,33 @@ SENSOR_DESCRIPTIONS: tuple[NationalGridSensorEntityDescription, ...] = (
         value_fn=_get_latest_interval_read,
         available_fn=lambda md: bool(md.meter.get("hasAmiSmartMeter"))
         and md.meter.get("fuelType", "").upper() != "GAS",
+    ),
+    NationalGridSensorEntityDescription(
+        key="interval_read_time",
+        translation_key="interval_read_time",
+        name="Latest 15-min Read Time",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=_get_latest_interval_read_time,
+        available_fn=lambda md: bool(md.meter.get("hasAmiSmartMeter"))
+        and md.meter.get("fuelType", "").upper() != "GAS",
+    ),
+    NationalGridSensorEntityDescription(
+        key="interval_today_total",
+        translation_key="interval_today_total",
+        name="Today's Usage",
+        native_unit_of_measurement=UNIT_KWH,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=_get_today_interval_total,
+        available_fn=lambda md: bool(md.meter.get("hasAmiSmartMeter"))
+        and md.meter.get("fuelType", "").upper() != "GAS",
+    ),
+    NationalGridSensorEntityDescription(
+        key="fuel_type",
+        translation_key="fuel_type",
+        name="Fuel Type",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=_get_fuel_type,
     ),
 )
 
