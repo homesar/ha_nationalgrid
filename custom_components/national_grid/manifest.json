@@ -8,6 +8,6 @@
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/ryanmorash/ha_nationalgrid/issues",
-  "requirements": ["aionatgrid @ git+https://github.com/virtitnerd/aionatgrid@531aa27f05c479baf003c7fbe7abb0690fd848f7"],
+  "requirements": ["aionatgrid @ git+https://github.com/virtitnerd/aionatgrid@370e2bd917f132eff312f01d31fe8c7367b42fd0"],
   "version": "0.1.2"
 }

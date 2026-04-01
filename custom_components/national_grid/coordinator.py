@@ -314,7 +314,7 @@ class NationalGridDataUpdateCoordinator(
                     service_point_number=sp,
                     meter_point_number=str(meter.get("meterPointNumber", "")),
                 )
-                ami_data = await self.api.get_ami_energy_usages(
+                ami_data = await self.api.get_ami_energy_usages_15min(
                     meter_number=ami_meter.meter_number,
                     premise_number=ami_meter.premise_number,
                     service_point_number=ami_meter.service_point_number,
