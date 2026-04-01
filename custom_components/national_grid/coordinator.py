@@ -485,3 +485,12 @@ class NationalGridDataUpdateCoordinator(
         if not readings:
             return None
         return max(readings, key=lambda r: r.get("date", ""))
+
+    def get_latest_interval_read(self, service_point_number: str) -> IntervalRead | None:
+        """Get the most recent 15-minute interval read for a service point."""
+        if self.data is None:
+            return None
+        reads = self.data.interval_reads.get(service_point_number, [])
+        if not reads:
+            return None
+        return max(reads, key=lambda r: r.get("startTime", ""))

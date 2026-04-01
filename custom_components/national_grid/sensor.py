@@ -9,6 +9,7 @@ from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
+    SensorStateClass,
 )
 
 from .const import _LOGGER, DOMAIN, UNIT_CCF, UNIT_KWH, therms_to_ccf
@@ -83,6 +84,35 @@ def _get_energy_device_class(meter_data: MeterData) -> SensorDeviceClass | None:
     return SensorDeviceClass.ENERGY
 
 
+def _get_latest_ami_usage(
+    coordinator: NationalGridDataUpdateCoordinator, meter_data: MeterData
+) -> float | None:
+    """Get the most recent AMI daily usage for a meter."""
+    sp = str(meter_data.meter.get("servicePointNumber", ""))
+    reading = coordinator.get_latest_ami_usage(sp)
+    if reading is None:
+        return None
+    quantity = reading.get("quantity")
+    if quantity is None:
+        return None
+    fuel_type = meter_data.meter.get("fuelType", "")
+    if fuel_type and fuel_type.upper() == "GAS":
+        return therms_to_ccf(float(quantity))
+    return float(quantity)
+
+
+def _get_latest_interval_read(
+    coordinator: NationalGridDataUpdateCoordinator, meter_data: MeterData
+) -> float | None:
+    """Get the most recent 15-minute interval read value for a meter."""
+    sp = str(meter_data.meter.get("servicePointNumber", ""))
+    read = coordinator.get_latest_interval_read(sp)
+    if read is None:
+        return None
+    value = read.get("value")
+    return float(value) if value is not None else None
+
+
 SENSOR_DESCRIPTIONS: tuple[NationalGridSensorEntityDescription, ...] = (
     NationalGridSensorEntityDescription(
         key="energy_cost",
@@ -99,6 +129,27 @@ SENSOR_DESCRIPTIONS: tuple[NationalGridSensorEntityDescription, ...] = (
         value_fn=_get_energy_usage,
         unit_fn=_get_energy_unit,
         device_class_fn=_get_energy_device_class,
+    ),
+    NationalGridSensorEntityDescription(
+        key="ami_daily_usage",
+        translation_key="ami_daily_usage",
+        name="Latest Smart Meter Daily Usage",
+        value_fn=_get_latest_ami_usage,
+        unit_fn=_get_energy_unit,
+        device_class_fn=_get_energy_device_class,
+        state_class=SensorStateClass.MEASUREMENT,
+        available_fn=lambda md: bool(md.meter.get("hasAmiSmartMeter")),
+    ),
+    NationalGridSensorEntityDescription(
+        key="interval_read",
+        translation_key="interval_read",
+        name="Latest 15-min Usage",
+        native_unit_of_measurement=UNIT_KWH,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=_get_latest_interval_read,
+        available_fn=lambda md: bool(md.meter.get("hasAmiSmartMeter"))
+        and md.meter.get("fuelType", "").upper() != "GAS",
     ),
 )
 
